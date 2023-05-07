@@ -7,7 +7,6 @@ docker.io
 registry.k8s.io
 ghcr.io
 quay.io
-registry.gitlab.com
 '
 
 # configure the registries.

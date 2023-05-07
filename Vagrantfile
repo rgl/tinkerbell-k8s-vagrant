@@ -69,14 +69,6 @@ etcdctl_version = 'v3.5.8'
 # renovate: datasource=helm depName=metallb registryUrl=https://charts.bitnami.com/bitnami
 metallb_chart_version = '4.4.1'
 
-# see https://gitlab.com/gitlab-org/charts/gitlab-runner/-/tags
-# renovate: datasource=helm depName=gitlab-runner registryUrl=https://charts.gitlab.io
-gitlab_runner_chart_version = '0.51.1'
-
-# link to the gitlab-vagrant environment (https://github.com/rgl/gitlab-vagrant running at ../gitlab-vagrant).
-gitlab_fqdn = 'gitlab.example.com'
-gitlab_ip = '10.10.9.99'
-
 # set the flannel backend. use one of:
 # * host-gw:          non-secure network (needs ethernet (L2) connectivity between nodes).
 # * vxlan:            non-secure network (needs UDP (L3) connectivity between nodes).
@@ -112,7 +104,6 @@ k3s_token     = get_or_generate_k3s_token
 extra_hosts = """
 #{registry_ip} #{registry_fqdn}
 #{server_vip} #{server_fqdn}
-#{gitlab_ip} #{gitlab_fqdn}
 """
 
 Vagrant.configure(2) do |config|
@@ -215,7 +206,6 @@ Vagrant.configure(2) do |config|
         config.vm.provision 'shell', path: 'provision-kube-vip.sh', args: [kube_vip_version, server_vip]
         config.vm.provision 'shell', path: 'provision-metallb.sh', args: [metallb_chart_version, lb_ip_range]
         config.vm.provision 'shell', path: 'provision-k8s-dashboard.sh', args: [k8s_dashboard_version]
-        config.vm.provision 'shell', path: 'provision-gitlab-runner.sh', args: [gitlab_runner_chart_version, gitlab_fqdn, gitlab_ip]
       end
     end
   end
@@ -246,25 +236,5 @@ Vagrant.configure(2) do |config|
         ip_address
       ]
     end
-  end
-
-  config.trigger.before :up do |trigger|
-    trigger.only_on = 's1'
-    trigger.run = {
-      inline: '''bash -euc \'
-mkdir -p tmp
-artifacts=(
-  ../gitlab-vagrant/tmp/gitlab.example.com-crt.pem
-  ../gitlab-vagrant/tmp/gitlab.example.com-crt.der
-  ../gitlab-vagrant/tmp/gitlab-runners-registration-token.txt
-)
-for artifact in "${artifacts[@]}"; do
-  if [ -f $artifact ]; then
-    cp $artifact tmp
-  fi
-done
-\'
-'''
-    }
   end
 end

@@ -13,7 +13,6 @@ docker.io
 registry.k8s.io
 ghcr.io
 quay.io
-registry.gitlab.com
 '
 
 # add the zot user.
