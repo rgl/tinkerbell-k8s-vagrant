@@ -31,6 +31,7 @@ install -m 750 -o zot -g zot -d /opt/zot
 zot_url="https://github.com/project-zot/zot/releases/download/v$zot_version/zot-linux-amd64"
 zot_dist_path="/vagrant/tmp/zot-$zot_version-$(basename "$zot_url")"
 if [ ! -f "$zot_dist_path" ]; then
+    install -d "$(dirname "$zot_dist_path")"
     wget -qO "$zot_dist_path" "$zot_url"
 fi
 install -m 755 -d /opt/zot/bin

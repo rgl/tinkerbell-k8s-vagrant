@@ -77,8 +77,8 @@ flannel_backend = 'host-gw'
 #flannel_backend = 'vxlan'
 #flannel_backend = 'wireguard-native'
 
-number_of_server_nodes  = 3
-number_of_agent_nodes   = 2
+number_of_server_nodes  = 1
+number_of_agent_nodes   = 1
 
 bridge_name           = nil
 registry_fqdn         = 'registry.example.test'
@@ -88,6 +88,9 @@ server_vip            = '10.11.0.30'
 first_server_node_ip  = '10.11.0.31'
 first_agent_node_ip   = '10.11.0.41'
 lb_ip_range           = '10.11.0.50-10.11.0.69'
+tinkbell_boots_ip     = '10.11.0.60'
+tinkbell_stack_ip     = '10.11.0.61'
+t1_ip                 = '10.11.0.70'
 
 # connect to the physical network through the host br-lan bridge.
 # bridge_name           = 'br-lan'
@@ -96,10 +99,18 @@ lb_ip_range           = '10.11.0.50-10.11.0.69'
 # first_server_node_ip  = '192.168.1.31'
 # first_agent_node_ip   = '192.168.1.41'
 # lb_ip_range           = '192.168.1.50-192.168.1.69'
+# tinkbell_boots_ip     = '192.168.1.60'
+# tinkbell_stack_ip     = '192.168.1.61'
+# t1_ip                 = '192.168.1.70'
 
 server_nodes  = generate_nodes(first_server_node_ip, number_of_server_nodes, 's')
 agent_nodes   = generate_nodes(first_agent_node_ip, number_of_agent_nodes, 'a')
 k3s_token     = get_or_generate_k3s_token
+
+virtual_machines = [
+  # [name, arch, firmware, ip, mac, bmc_type, bmc_ip, bmc_port, bmc_qmp_port]
+  ['t1', 'amd64', 'uefi', t1_ip, sprintf('08:00:27:00:00:%02x', 70), nil, '0.0.0.0', 0, 0],
+]
 
 extra_hosts = """
 #{registry_ip} #{registry_fqdn}
@@ -164,7 +175,7 @@ Vagrant.configure(2) do |config|
       config.vm.provision 'shell', path: 'provision-network.sh', args: [registry_ip]
       config.vm.provision 'reload'
     else
-      config.vm.network :private_network, ip: registry_ip, libvirt__forward_mode: 'none', libvirt__dhcp_enabled: false
+      config.vm.network :private_network, ip: registry_ip, libvirt__forward_mode: 'nat', libvirt__dhcp_enabled: false
     end
     config.vm.provision 'shell', path: 'provision-base.sh', args: [extra_hosts]
     config.vm.provision 'shell', path: 'provision-zot.sh', args: [zot_version]
@@ -184,7 +195,7 @@ Vagrant.configure(2) do |config|
         config.vm.provision 'shell', path: 'provision-network.sh', args: [ip_address]
         config.vm.provision 'reload'
       else
-        config.vm.network :private_network, ip: ip_address, libvirt__forward_mode: 'none', libvirt__dhcp_enabled: false
+        config.vm.network :private_network, ip: ip_address, libvirt__forward_mode: 'nat', libvirt__dhcp_enabled: false
       end
       config.vm.provision 'shell', path: 'provision-base.sh', args: [extra_hosts]
       config.vm.provision 'shell', path: 'provision-wireguard.sh'
@@ -224,7 +235,7 @@ Vagrant.configure(2) do |config|
         config.vm.provision 'shell', path: 'provision-network.sh', args: [ip_address]
         config.vm.provision 'reload'
       else
-        config.vm.network :private_network, ip: ip_address, libvirt__forward_mode: 'none', libvirt__dhcp_enabled: false
+        config.vm.network :private_network, ip: ip_address, libvirt__forward_mode: 'nat', libvirt__dhcp_enabled: false
       end
       config.vm.provision 'shell', path: 'provision-base.sh', args: [extra_hosts]
       config.vm.provision 'shell', path: 'provision-wireguard.sh'
@@ -235,6 +246,62 @@ Vagrant.configure(2) do |config|
         k3s_token,
         ip_address
       ]
+    end
+  end
+
+  virtual_machines.each do |name, arch, firmware, ip, mac, bmc_type, bmc_ip, bmc_port, bmc_qmp_port|
+    config.vm.define name do |config|
+      config.vm.box = nil
+      config.vm.provider :libvirt do |lv, config|
+        lv.loader = '/usr/share/ovmf/OVMF.fd' if firmware == 'uefi'
+        lv.boot 'hd'
+        lv.boot 'network'
+        lv.memory = 4*1024
+        lv.storage :file, :size => '16G', :device => 'sda', :bus => 'scsi', :discard => 'unmap', :detect_zeroes => 'unmap', :cache => 'unsafe'
+        if bridge_name
+          config.vm.network :public_network, mode: 'bridge', type: 'bridge', dev: bridge_name, mac: mac, ip: ip, auto_config: false
+        else
+          config.vm.network :private_network, mac: mac, ip: ip, auto_config: false
+        end
+        lv.mgmt_attach = false
+        lv.machine_type = 'q35'
+        lv.graphics_type = 'spice'
+        lv.video_type = 'qxl'
+        lv.channel :type => 'unix', :target_name => 'org.qemu.guest_agent.0', :target_type => 'virtio'
+        lv.channel :type => 'spicevmc', :target_name => 'com.redhat.spice.0', :target_type => 'virtio'
+        # set some BIOS settings that will help us identify this particular machine.
+        #
+        #   QEMU                | Linux
+        #   --------------------+----------------------------------------------
+        #   type=1,manufacturer | /sys/devices/virtual/dmi/id/sys_vendor
+        #   type=1,product      | /sys/devices/virtual/dmi/id/product_name
+        #   type=1,version      | /sys/devices/virtual/dmi/id/product_version
+        #   type=1,serial       | /sys/devices/virtual/dmi/id/product_serial
+        #   type=1,sku          | dmidecode
+        #   type=1,uuid         | /sys/devices/virtual/dmi/id/product_uuid
+        #   type=3,manufacturer | /sys/devices/virtual/dmi/id/chassis_vendor
+        #   type=3,family       | /sys/devices/virtual/dmi/id/chassis_type
+        #   type=3,version      | /sys/devices/virtual/dmi/id/chassis_version
+        #   type=3,serial       | /sys/devices/virtual/dmi/id/chassis_serial
+        #   type=3,asset        | /sys/devices/virtual/dmi/id/chassis_asset_tag
+        [
+          'type=1,manufacturer=your vendor name here',
+          'type=1,product=your product name here',
+          'type=1,version=your product version here',
+          'type=1,serial=your product serial number here',
+          'type=1,sku=your product SKU here',
+          "type=1,uuid=00000000-0000-4000-8000-#{mac.tr(':', '')}",
+          'type=3,manufacturer=your chassis vendor name here',
+          #'type=3,family=1', # TODO why this does not work on qemu from ubuntu 18.04?
+          'type=3,version=your chassis version here',
+          'type=3,serial=your chassis serial number here',
+          "type=3,asset=your chassis asset tag here #{name}",
+        ].each do |value|
+          lv.qemuargs :value => '-smbios'
+          lv.qemuargs :value => value
+        end
+        config.vm.synced_folder '.', '/vagrant', disabled: true
+      end
     end
   end
 end
