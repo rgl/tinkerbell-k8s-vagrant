@@ -78,7 +78,7 @@ flannel_backend = 'host-gw'
 #flannel_backend = 'wireguard-native'
 
 number_of_server_nodes  = 1
-number_of_agent_nodes   = 1
+number_of_agent_nodes   = 0
 
 bridge_name           = nil
 registry_fqdn         = 'registry.example.test'
@@ -184,10 +184,10 @@ Vagrant.configure(2) do |config|
   server_nodes.each do |name, fqdn, ip_address, n|
     config.vm.define name do |config|
       config.vm.provider 'libvirt' do |lv, config|
-        lv.memory = 2*1024
+        lv.memory = 4*1024
       end
       config.vm.provider 'virtualbox' do |vb|
-        vb.memory = 2*1024
+        vb.memory = 4*1024
       end
       config.vm.hostname = fqdn
       if bridge_name
