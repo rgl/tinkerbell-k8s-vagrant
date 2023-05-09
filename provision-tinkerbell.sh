@@ -38,7 +38,7 @@ cd tinkerbell/stack
 # install tinkerbell.
 # see https://docs.tinkerbell.org/hardware-data/
 helm dependency build
-if helm list -n tink-system stack >/dev/null 2>&1; then
+if [ "$(helm list -n tink-system -o json --filter stack | jq length)" != '0' ]; then
   helm uninstall -n tink-system --wait stack
 fi
 if kubectl -n tink-system get workflow t1 >/dev/null 2>&1; then
