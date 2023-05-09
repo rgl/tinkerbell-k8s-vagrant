@@ -41,14 +41,14 @@ helm dependency build
 if [ "$(helm list -n tink-system -o json --filter stack | jq length)" != '0' ]; then
   helm uninstall -n tink-system --wait stack
 fi
-if kubectl -n tink-system get workflow t1 >/dev/null 2>&1; then
-  kubectl -n tink-system delete workflow t1
+if kubectl -n tink-system get workflow.tinkerbell.org t1 >/dev/null 2>&1; then
+  kubectl -n tink-system delete workflow.tinkerbell.org t1
 fi
-if kubectl -n tink-system get hardware t1 >/dev/null 2>&1; then
-  kubectl -n tink-system delete hardware t1
+if kubectl -n tink-system get hardware.tinkerbell.org t1 >/dev/null 2>&1; then
+  kubectl -n tink-system delete hardware.tinkerbell.org t1
 fi
-if kubectl -n tink-system get template t1 >/dev/null 2>&1; then
-  kubectl -n tink-system delete template hello
+if kubectl -n tink-system get templates.tinkerbell.org hello >/dev/null 2>&1; then
+  kubectl -n tink-system delete templates.tinkerbell.org hello
 fi
 helm upgrade --install \
   stack \
