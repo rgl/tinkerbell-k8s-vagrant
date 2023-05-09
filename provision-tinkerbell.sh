@@ -7,6 +7,8 @@ trusted_proxies="$(kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}' | tr
 t1_mac='08:00:27:00:00:46'
 t1_ip='10.11.0.70'
 t1_gw='10.11.0.1'
+t1_bmc_ip='10.11.0.1'
+t1_bmc_port='8070'
 
 # when connected to the physical network, these are the used IP addresses:
 #   network:                   192.168.1.0/24
@@ -49,6 +51,15 @@ if kubectl -n tink-system get hardware.tinkerbell.org t1 >/dev/null 2>&1; then
 fi
 if kubectl -n tink-system get templates.tinkerbell.org hello >/dev/null 2>&1; then
   kubectl -n tink-system delete templates.tinkerbell.org hello
+fi
+if kubectl -n tink-system get jobs.bmc.tinkerbell.org t1 >/dev/null 2>&1; then
+  kubectl -n tink-system delete jobs.bmc.tinkerbell.org t1
+fi
+if kubectl -n tink-system get machine.bmc.tinkerbell.org t1 >/dev/null 2>&1; then
+  kubectl -n tink-system delete machine.bmc.tinkerbell.org t1
+fi
+if kubectl -n tink-system get secret t1-bmc >/dev/null 2>&1; then
+  kubectl -n tink-system delete secret t1-bmc
 fi
 helm upgrade --install \
   stack \
@@ -149,7 +160,7 @@ spec:
                 echo 'Exiting...' >/dev/tty0
 EOF
 
-# install the hardware and workflow.
+# install the hardware, workflow, bmc machine and bmc job.
 kubectl apply -n tink-system -f - <<EOF
 ---
 apiVersion: tinkerbell.org/v1alpha1
@@ -191,4 +202,42 @@ spec:
   hardwareRef: t1
   hardwareMap:
     device_1: $t1_mac
+---
+apiVersion: v1
+kind: Secret
+type: kubernetes.io/basic-auth
+metadata:
+  name: t1-bmc
+data:
+  username: $(echo admin | base64)
+  password: $(echo password | base64)
+---
+apiVersion: bmc.tinkerbell.org/v1alpha1
+kind: Machine
+metadata:
+  name: t1
+spec:
+  connection:
+    host: $t1_bmc_ip
+    port: $t1_bmc_port
+    authSecretRef:
+      namespace: tink-system
+      name: t1-bmc
+    insecureTLS: true
+---
+apiVersion: bmc.tinkerbell.org/v1alpha1
+kind: Job
+metadata:
+  name: t1
+spec:
+  machineRef:
+    namespace: tink-system
+    name: t1
+  tasks:
+    - powerAction: "off"
+    - oneTimeBootDeviceAction:
+        device:
+          - pxe
+        efiBoot: false
+    - powerAction: "on"
 EOF

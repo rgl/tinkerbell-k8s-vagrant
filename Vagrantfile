@@ -6,24 +6,7 @@ ENV['VAGRANT_NO_PARALLEL'] = 'yes'
 # NB this is needed to modify the libvirt domain scsi controller model to virtio-scsi.
 ENV['VAGRANT_EXPERIMENTAL'] = 'typed_triggers'
 
-require 'ipaddr'
-require 'open3'
-
-def get_or_generate_k3s_token
-  # TODO generate an unique random an cache it.
-  # generated with openssl rand -hex 32
-  '7e982a7bbac5f385ecbb988f800787bc9bb617552813a63c4469521c53d83b6e'
-end
-
-def generate_nodes(first_ip_address, count, name_prefix)
-  ip_addr = IPAddr.new first_ip_address
-  (1..count).map do |n|
-    ip_address, ip_addr = ip_addr.to_s, ip_addr.succ
-    name = "#{name_prefix}#{n}"
-    fqdn = "#{name}.example.test"
-    [name, fqdn, ip_address, n]
-  end
-end
+require './lib.rb'
 
 # see https://github.com/project-zot/zot/releases
 # renovate: datasource=github-releases depName=project-zot/zot
@@ -81,6 +64,7 @@ number_of_server_nodes  = 1
 number_of_agent_nodes   = 0
 
 bridge_name           = nil
+host_ip               = '10.11.0.1'
 registry_fqdn         = 'registry.example.test'
 registry_ip           = '10.11.0.4'
 server_fqdn           = 's.example.test'
@@ -94,6 +78,7 @@ t1_ip                 = '10.11.0.70'
 
 # connect to the physical network through the host br-lan bridge.
 # bridge_name           = 'br-lan'
+# host_ip               = '192.168.1.11'
 # registry_ip           = '192.168.1.4'
 # server_vip            = '192.168.1.30'
 # first_server_node_ip  = '192.168.1.31'
@@ -109,7 +94,7 @@ k3s_token     = get_or_generate_k3s_token
 
 virtual_machines = [
   # [name, arch, firmware, ip, mac, bmc_type, bmc_ip, bmc_port, bmc_qmp_port]
-  ['t1', 'amd64', 'uefi', t1_ip, sprintf('08:00:27:00:00:%02x', 70), nil, '0.0.0.0', 0, 0],
+  ['t1', 'amd64', 'uefi', t1_ip, sprintf('08:00:27:00:00:%02x', 70), 'ipmi', host_ip, 8070, 9070],
 ]
 
 extra_hosts = """
@@ -301,7 +286,21 @@ Vagrant.configure(2) do |config|
           lv.qemuargs :value => '-smbios'
           lv.qemuargs :value => value
         end
+        # expose the VM QMP socket.
+        # see https://gist.github.com/rgl/dc38c6875a53469fdebb2e9c0a220c6c
+        #lv.qemuargs :value => '-qmp'
+        #lv.qemuargs :value => "tcp:#{bmc_ip}:#{bmc_qmp_port},server,nowait"
         config.vm.synced_folder '.', '/vagrant', disabled: true
+        config.trigger.after :up do |trigger|
+          trigger.ruby do |env, machine|
+            vbmc_up(machine, bmc_type, bmc_ip, bmc_port)
+          end
+        end
+        config.trigger.after :destroy do |trigger|
+          trigger.ruby do |env, machine|
+            vbmc_destroy(machine, bmc_type)
+          end
+        end
       end
     end
   end
