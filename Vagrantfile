@@ -67,7 +67,7 @@ etcdctl_version = 'v3.5.9'
 
 # see https://artifacthub.io/packages/helm/bitnami/metallb
 # renovate: datasource=helm depName=metallb registryUrl=https://charts.bitnami.com/bitnami
-metallb_chart_version = '4.4.1'
+metallb_chart_version = '4.4.2'
 
 # set the flannel backend. use one of:
 # * host-gw:          non-secure network (needs ethernet (L2) connectivity between nodes).
