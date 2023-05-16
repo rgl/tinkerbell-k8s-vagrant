@@ -25,7 +25,7 @@ if [ -d tinkerbell-charts ]; then
   cd tinkerbell-charts
 else
   tinkerbell_repository='https://github.com/tinkerbell/charts.git'
-  tinkerbell_version='a43cc8b30feb5a7a45b9b5b193a09aec691f55c0' # 2023-05-04T23:05:59Z
+  tinkerbell_version='653b6dd9aea530cd1d29e6917a1c80142a209ca5' # 2023-05-15T21:23:39Z
   git clone --no-checkout $tinkerbell_repository tinkerbell-charts
   cd tinkerbell-charts
   git checkout -f $tinkerbell_version
@@ -61,13 +61,9 @@ stack:
   hook:
     downloads:
       - url: https://github.com/tinkerbell/hook/releases/download/v0.8.0/hook_x86_64.tar.gz
-        sha512sum:
-          kernel: 45a83dc747ff05fda09dc7a3b376fca3d82079fbfe99927d9f1c935f2070b5ac6469a41387fefd9e2eeb51062959846900583274a5d02e4131f37162a6167b28  vmlinuz-x86_64
-          initramfs: 17ca45318762975464e7abd8f09316d96a658cbbf38c46a47b1ff6f712cffc23d035091883e7e94c21a3b54d8f67c4a982e1fac206449d79f86773ea8c6b7ec6  initramfs-x86_64
+        sha512sum: 498cccba921c019d4526a2a562bd2d9c8efba709ab760fa9d38bd8de1efeefc8e499c9249af9571aa28a1e371e6c928d5175fa70d5d7addcf3dd388caeff1a45
       - url: https://github.com/tinkerbell/hook/releases/download/v0.8.0/hook_aarch64.tar.gz
-        sha512sum:
-          kernel: 80c14e9b2407aabe59b40d7d60e0b96cb2b8812a13d9c278ad1f042aea510d6ff0e4de3c42e39ed049fda871564744cd9f2559d72c3f010331dde62c18af2c77  vmlinuz-aarch64
-          initramfs: 5a4eaea8c77c0e574ae3264ddec25a35e758205a75931a61a7911d2b5ac7151e2711a3633b08c05ffc89ab26f81224ea60bb420dab65fd1ccd0b77990db0361a  initramfs-aarch64
+        sha512sum: 56e3959722c9ae85aec6c214448108e2dc1d581d2c884ca7a23265c1ae28489589481730fbb941fac8239f6222f9b5bb757987a5238f20194e184ae7e83b6a5b
 boots:
   image: quay.io/tinkerbell/boots:v0.8.0
   hostNetwork: true
